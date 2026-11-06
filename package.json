@@ -1,6 +1,6 @@
 {
   "name": "dsh-wx-desktop",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "微信桌面桥 / WeChat Desk Bridge：在 Windows 上用真实的电脑微信客户端驱动 DSH agent——监听本地消息库、唤醒会话、把回复打回聊天窗口（自带设置面板）。",
   "type": "module",
   "main": "./index.js",
@@ -31,6 +31,8 @@
     "panel.js",
     "cordis.patch.yml",
     "setup.ps1",
+    "install.ps1",
+    "bootstrap.ps1",
     "scripts/",
     "README.md",
     "README.en.md",
@@ -49,5 +51,16 @@
         "@deepseek-ai/dsh-client-locale"
       ]
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CHSCN123/dsh-wechat-desktop.git"
+  },
+  "homepage": "https://github.com/CHSCN123/dsh-wechat-desktop#readme",
+  "bugs": {
+    "url": "https://github.com/CHSCN123/dsh-wechat-desktop/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
