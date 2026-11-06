@@ -234,6 +234,10 @@ python %USERPROFILE%\.dsh\weixin\wcdb\watch.py --once            # 首次解密�
 
 ---
 
+## 维护者：发布到 npm
+
+见 PUBLISHING.md。发布后别人一行就能装：`dsh plugin --profile web add dsh-wx-desktop`。
+
 ## 许可
 
 MIT。微信是腾讯的商标，本项目与之无关；使用前请确认不违反当地法规与服务条款。

@@ -1,3 +1,10 @@
+## 0.3.1 — 2026-11-06
+
+- 一行安装：`bootstrap.ps1`（下载源码 → 装插件 → 写配置），README 中英同步。
+- `install.ps1`：自动探测本机 DSH（运行中的 exe / 常见安装目录 / PATH 里的 dsh），自动列出微信数据目录并交互确认，缺会话桥时给提示。
+- `package.json`：补 repository / homepage / bugs / publishConfig，`files` 带上安装脚本；可直接 npm publish。
+- 新增 `PUBLISHING.md`（维护者发布流程）。
+
 ## 0.3.0 — 2026-11-06
 
 - 设置页入口：`client.js` 注册 `settings.section`，DSH 设置里直接出现「微信桌面桥」，内嵌面板（iframe），也可在新窗口打开。
