@@ -1,11 +1,12 @@
 {
   "name": "dsh-wx-desktop",
-  "version": "0.2.0",
-  "description": "微信桌面桥 / WeChat Desk Bridge — drive a DSH agent from the real desktop WeChat client on Windows: watch the local message DB, wake a session, type the reply back into the chat window.",
+  "version": "0.3.0",
+  "description": "微信桌面桥 / WeChat Desk Bridge：在 Windows 上用真实的电脑微信客户端驱动 DSH agent——监听本地消息库、唤醒会话、把回复打回聊天窗口（自带设置面板）。",
   "type": "module",
   "main": "./index.js",
   "exports": {
     ".": "./index.js",
+    "./client": "./client.js",
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml"
   },
@@ -26,15 +27,27 @@
   ],
   "files": [
     "index.js",
+    "client.js",
+    "panel.js",
     "cordis.patch.yml",
-    "verify-cold-start.ps1",
+    "setup.ps1",
     "scripts/",
     "README.md",
-    "README.en.md"
+    "README.en.md",
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings-plugins",
+        "@deepseek-ai/dsh-client-ui-primitives",
+        "@deepseek-ai/dsh-client-locale"
+      ]
     }
   }
 }

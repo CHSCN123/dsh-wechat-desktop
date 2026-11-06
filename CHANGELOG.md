@@ -1,3 +1,8 @@
+## 0.3.0 — 2026-11-06
+
+- 设置页入口：`client.js` 注册 `settings.section`，DSH 设置里直接出现「微信桌面桥」，内嵌面板（iframe），也可在新窗口打开。
+- `package.json` 增加 `dsh.client`（platform: web + inject）、导出 `./client`。
+- 面板地址统一走 `panelPort`（默认 47180）。
 # 更新日志
 
 ## 0.2.0 — 2026-11-06
