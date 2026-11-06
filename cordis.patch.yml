@@ -1,0 +1,13 @@
+# 微信桌面桥 / dsh-wx-desktop
+#
+# 把本机电脑微信接成 DSH 的一条输入通道：读本地解密库 → 唤醒会话 → 回复敲回聊天窗口。
+# 与 dsh-plugin-weixin（iLink 机器人通道）互补。
+#
+# 下面只声明插件本身。真正的可调项写在 profile 的 cordis.patch.yml 里，
+# 形如 `- id: dsh-wx-desktop` + `config:`（dataDir / dbDir / chatUser / peerName …）。
+#
+# 注意：这个 bundle 文件必须保持"纯 insert"（不带 config），否则 dshmarket 的
+# 热挂载会拒绝它；用户配置请写在 profile 的 patch 文件里。
+- insert:
+    - id: dsh-wx-desktop
+      name: dsh-wx-desktop

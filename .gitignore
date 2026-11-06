@@ -1,0 +1,22 @@
+# 依赖与构建产物
+node_modules/
+*.tgz
+
+# 运行期数据（绝不能进仓库：里面有聊天库路径、密钥、日志、截图）
+data/
+logs/
+tmp/
+*.log
+
+# 本机实测留下的东西
+sticker_lab/
+incoming/
+*.bak-*
+*.bak.*
+_*_test.mjs
+dist/
+
+# 编辑器
+.vscode/
+.idea/
+.DS_Store
