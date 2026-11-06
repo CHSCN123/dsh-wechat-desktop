@@ -1,4 +1,4 @@
-﻿# 微信桌面桥 / WeChat Desk Bridge —— 一键安装
+# 微信桌面桥 / WeChat Desk Bridge —— 一键安装
 #
 # 用法（在克隆出来的目录里）：
 #   powershell -ExecutionPolicy Bypass -File .\install.ps1 -DbDir "D:\WeChat\...\db_storage" -ChatUser wxid_xxx -PeerName "张三"
@@ -126,7 +126,67 @@ if (-not (Test-Path $bridgeGuess)) {
   Say ("        dsh plugin --profile $Profile add dsh-plugin-weixin")
 }
 
-# ---------- 6. 写配置 ----------
+# ---------- 6. 自己找微信数据目录（找不到再问） ----------
+function Find-WxAccounts {
+  $roots = @()
+  if ($env:USERPROFILE) {
+    $roots += (Join-Path $env:USERPROFILE 'Documents\xwechat_files')
+    $roots += (Join-Path $env:USERPROFILE 'Documents\WeChat Files')
+  }
+  foreach ($d in (Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Name -match '^[A-Z]$' })) {
+    $roots += (Join-Path ($d.Name + ':\') 'LeStoreDownload\xwechat_files')
+    $roots += (Join-Path ($d.Name + ':\') 'xwechat_files')
+    $roots += (Join-Path ($d.Name + ':\') 'WeChat Files')
+  }
+  $out = @()
+  foreach ($r in $roots) {
+    if (-not (Test-Path $r)) { continue }
+    foreach ($acct in (Get-ChildItem $r -Directory -ErrorAction SilentlyContinue)) {
+      $db = Join-Path $acct.FullName 'db_storage'
+      if (Test-Path (Join-Path $db 'message')) {
+        # 目录名是 wxid_xxx_ab12 这种，配置里用的是去掉 4 位后缀的 wxid
+        $user = ($acct.Name -replace '_[0-9a-fA-F]{4}$', '')
+        $out += [pscustomobject]@{ DbDir = $db; ChatUser = $user }
+      }
+    }
+  }
+  return $out
+}
+
+$interactive = $true
+try { if (-not [Environment]::UserInteractive) { $interactive = $false } } catch { }
+
+if (-not $SkipConfig -and ([string]::IsNullOrWhiteSpace($DbDir) -or [string]::IsNullOrWhiteSpace($ChatUser))) {
+  $found = @(Find-WxAccounts)
+  if ($found.Count -gt 0) {
+    Say '检测到这些微信数据目录（选一个，回车用第 1 个）：'
+    for ($i = 0; $i -lt $found.Count; $i++) {
+      Say ("  [" + ($i + 1) + '] ' + $found[$i].ChatUser + '  ' + $found[$i].DbDir)
+    }
+    if ($interactive) {
+      $pick = Read-Host '[install] 输入序号（直接回车 = 1）'
+      if ([string]::IsNullOrWhiteSpace($pick)) { $pick = '1' }
+      $idx = 0
+      if ([int]::TryParse($pick, [ref]$idx) -and $idx -ge 1 -and $idx -le $found.Count) {
+        $DbDir = $found[$idx - 1].DbDir
+        if ([string]::IsNullOrWhiteSpace($ChatUser)) { $ChatUser = $found[$idx - 1].ChatUser }
+      }
+    } else {
+      $DbDir = $found[0].DbDir
+      if ([string]::IsNullOrWhiteSpace($ChatUser)) { $ChatUser = $found[0].ChatUser }
+      Say ('非交互模式，自动用第 1 个：' + $DbDir)
+    }
+  }
+  if ($interactive -and ([string]::IsNullOrWhiteSpace($DbDir) -or [string]::IsNullOrWhiteSpace($ChatUser))) {
+    if ([string]::IsNullOrWhiteSpace($DbDir)) { $DbDir = Read-Host '[install] 小号微信的 db_storage 目录（含 message 子目录）' }
+    if ([string]::IsNullOrWhiteSpace($ChatUser)) { $ChatUser = Read-Host '[install] 小号的 wxid（就是 db_storage 上一级目录名）' }
+  }
+  if ($interactive -and [string]::IsNullOrWhiteSpace($PeerName)) {
+    $PeerName = Read-Host '[install] 要对接的人/群显示名（例如 张三；留空也行）'
+  }
+}
+
+# ---------- 7. 写配置 ----------
 if ($SkipConfig) {
   Say '跳过配置。之后手动跑：.\setup.ps1 -DbDir ... -ChatUser ... -PeerName ...'
 } elseif ([string]::IsNullOrWhiteSpace($DbDir) -or [string]::IsNullOrWhiteSpace($ChatUser)) {
