@@ -7,7 +7,7 @@ process allowed to drive the UI: sessions drop a JSON job into send-queue/ and
 this loop sends them one by one.
 
 Job file (one JSON object, UTF-8, no BOM):
-    {"chat": "猪葛凉", "text": "hi", "actor": "desktop", "verify": true}
+    {"chat": "张三", "text": "hi", "actor": "desktop", "verify": true}
 
 Behaviour:
   * queue is FIFO by file mtime, one send at a time, >= THROTTLE seconds apart

@@ -11,15 +11,15 @@ window flash and sometimes typed into the wrong chat):
      wx_find_chat.ps1 (the only step that touches the list)
   4. paste the text (Ctrl+V) and press Enter 500 ms later
 
-  wx_say.ps1 -Chat "猪葛凉" -Text "hello"
-  wx_say.ps1 -Chat "黑暗四天王" -TextFile msg.txt -ShotDir "E:\DSH\GZJT GC"
+  wx_say.ps1 -Chat "张三" -Text "hello"
+  wx_say.ps1 -Chat "黑暗四天王" -TextFile msg.txt -ShotDir "$env:TEMP\wx-shots"
 #>
 param(
   [Parameter(Mandatory = $true)][string]$Chat,
   [string]$Text = '',
   [string]$TextFile = '',
   [string]$NotContains = '',
-  [string]$ShotDir = 'E:\DSH\GZJT GC',
+  [string]$ShotDir = (Join-Path $env:TEMP 'wx-shots'),
   [int]$PasteDelayMs = 600,
     [int]$SubmitDelayMs = 500,
     [int]$SendX = 1430,

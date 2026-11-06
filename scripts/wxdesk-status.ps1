@@ -5,7 +5,7 @@
 # with a BOM.
 $ErrorActionPreference = 'SilentlyContinue'
 
-$log = 'C:\Users\LX\.dsh\weixin\wcdb\plugin.log'
+$log = (Join-Path $PSScriptRoot 'plugin.log')
 $profileDir = 'C:\Users\LX\AppData\Roaming\dsh-desktop\harness\profiles\web'
 
 Write-Output '== watcher processes =='
@@ -22,7 +22,7 @@ Write-Output ''
 Write-Output '== lock =='
 # watch.lock itself is byte-locked by the owner, so it cannot be read; the
 # watcher mirrors its pid into watch.lock.owner for diagnostics.
-$ownerFile = 'C:\Users\LX\.dsh\weixin\wcdb\watch.lock.owner'
+$ownerFile = (Join-Path $PSScriptRoot 'watch.lock.owner')
 if (Test-Path $ownerFile) {
   $opid = (Get-Content $ownerFile -Raw).Trim()
   $alive = Get-Process -Id ([int]$opid) -ErrorAction SilentlyContinue
@@ -49,5 +49,5 @@ if (Test-Path $log) { Get-Content $log -Encoding UTF8 -Tail 20 } else { Write-Ou
 
 Write-Output ''
 Write-Output '== recent inbound messages (last 5) =='
-$inbox = 'C:\Users\LX\.dsh\weixin\wcdb\inbox.jsonl'
+$inbox = (Join-Path $PSScriptRoot 'inbox.jsonl')
 if (Test-Path $inbox) { Get-Content $inbox -Encoding UTF8 -Tail 5 } else { Write-Output '  no inbox.jsonl yet' }

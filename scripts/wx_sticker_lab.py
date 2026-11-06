@@ -5,7 +5,7 @@
   python wx_sticker_lab.py --harvest            # 量当前页 + 逐格截图存 PNG
   python wx_sticker_lab.py --harvest --page 1   # 先翻一页再量（翻页靠滚轮）
 
-产出（默认 C:\\Users\\LX\\.dsh\\weixin\\wcdb\\sticker_lab\\）：
+产出（默认 <dataDir>\\wcdb\\sticker_lab\\）：
   page{n}.png          整块面板（黑白卡片的原样，给我自己看布局）
   page{n}_r{r}c{c}.png 单格表情（四周留一点边，够认）
   page{n}.json         {cols,rows,cell_w,cell_h,items:[{r,c,x,y}]}  坐标是窗口客户区内的绝对点
@@ -15,17 +15,19 @@
 import argparse
 import json
 import os
+
+HERE = os.path.dirname(os.path.abspath(__file__))
 import sys
 import time
 
-sys.path.insert(0, r"C:\Users\LX\.dsh\weixin\wcdb")
+sys.path.insert(0, r"<dataDir>\wcdb")
 
 import numpy as np
 from PIL import Image
 
 import wx_sticker as W
 
-OUT = r"C:\Users\LX\.dsh\weixin\wcdb\sticker_lab"
+OUT = os.path.join(HERE, "sticker_lab")
 
 
 def open_panel(hwnd, pid):

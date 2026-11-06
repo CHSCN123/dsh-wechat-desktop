@@ -3,12 +3,12 @@ import { startPanel } from 'file:///E:/DSH/dsh-wx-desktop/panel.js'
 
 const cfg = resolveConfig({
   ...DEFAULTS,
-  dataDir: 'C:\\Users\\LX\\.dsh\\weixin',
-  pythonPath: 'C:\\Users\\LX\\.dsh\\weixin\\asr-venv\\Scripts\\python.exe',
-  nodePath: 'C:\\Users\\LX\\cmd ai\\node.exe',
-  dbDir: 'D:\\LeStoreDownload\\xwechat_files\\wxid_kn207qgkufhp29_5794\\db_storage',
-  chatUser: 'wxid_hmqh1bam6y3422',
-  peerName: '猪葛凉',
+  dataDir: process.env.WX_DATA_DIR ?? 'C:\\Users\\me\\.dsh\\weixin',
+  pythonPath: process.env.WX_PYTHON ?? 'python',
+  nodePath: process.env.WX_NODE ?? 'node',
+  dbDir: process.env.WX_DB_DIR ?? 'D:\\WeChat\\wxid_test\\db_storage',
+  chatUser: process.env.WX_CHAT_USER ?? 'wxid_test',
+  peerName: process.env.WX_PEER_NAME ?? '张三',
   panelPort: 47189,
 })
 

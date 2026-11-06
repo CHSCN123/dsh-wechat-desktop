@@ -1,4 +1,7 @@
 ﻿"""用 wx_sticker.py 的定位/点击基建发文字：还原窗口 -> 点输入框 -> 清空 -> 粘贴 -> 回车。"""
+import os
+
+HERE = os.path.dirname(os.path.abspath(__file__))
 import argparse
 import ctypes
 import importlib.util
@@ -6,11 +9,11 @@ import subprocess
 import sys
 import time
 
-spec = importlib.util.spec_from_file_location("ws", r"C:\Users\LX\.dsh\weixin\wcdb\wx_sticker.py")
+spec = importlib.util.spec_from_file_location("ws", os.path.join(HERE, "wx_sticker.py"))
 ws = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ws)
 
-spec2 = importlib.util.spec_from_file_location("thr", r"C:\Users\LX\.dsh\weixin\wcdb\wx_throttle.py")
+spec2 = importlib.util.spec_from_file_location("thr", os.path.join(HERE, "wx_throttle.py"))
 thr = importlib.util.module_from_spec(spec2)
 spec2.loader.exec_module(thr)
 
@@ -76,7 +79,7 @@ def _send(args):
     u.keybd_event(0x2E, 0, 2, 0); time.sleep(0.15)
 
     subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
-                    "-File", r"C:\Users\LX\.dsh\weixin\wcdb\wx_clip.ps1",
+                    "-File", os.path.join(HERE, "wx_clip.ps1"),
                     "-Text", args.text], check=False)
     time.sleep(0.35)
     ctrl(0x56)                 # 粘贴

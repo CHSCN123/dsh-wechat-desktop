@@ -8,10 +8,18 @@
   [string]$Image = '',
   # 0 = resolve automatically (the client that OWNS the bot account database).
   [long]$Hwnd = 0,
-  [string]$DbFile = 'D:\LeStoreDownload\xwechat_files\wxid_kn207qgkufhp29_5794\db_storage\message\message_0.db',
+  [string]$DbFile = $(
+    if ($env:WX_DB_FILE) { $env:WX_DB_FILE }
+    else {
+      $localEnv = Join-Path $PSScriptRoot 'local-env.json'
+      if (Test-Path -LiteralPath $localEnv) {
+        (Get-Content -LiteralPath $localEnv -Raw -Encoding UTF8 | ConvertFrom-Json).dbFile
+      } else { '' }
+    }
+  ),
   # Prepare the composer but do not press the publish button.
   [switch]$NoPublish,
-  [string]$ShotDir = 'E:\DSH\GZJT GC',
+  [string]$ShotDir = (Join-Path $env:TEMP 'wx-shots'),
   # Window is parked at this rect so the control fractions below stay valid.
   [int]$WinX = 0,
   [int]$WinY = 0,

@@ -1,6 +1,6 @@
 ﻿# wx_wherem.ps1 - 教学用：把鼠标放到目标位置，运行本脚本，读回屏幕坐标 + 相对窗口比例
 param(
-  [string]$Desktop = 'E:\DSH\GZJT GC',
+  [string]$Desktop = (Join-Path $env:TEMP 'wx-shots'),
   [switch]$NoShot
 )
 Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public class Wm{[DllImport("user32.dll")]public static extern bool SetProcessDpiAwarenessContext(IntPtr c);[DllImport("user32.dll")]public static extern bool GetCursorPos(out POINT p);[DllImport("user32.dll")]public static extern bool GetWindowRect(IntPtr h,out RECT r);[DllImport("user32.dll")]public static extern bool IsWindowVisible(IntPtr h);[StructLayout(LayoutKind.Sequential)]public struct POINT{public int X;public int Y;}[StructLayout(LayoutKind.Sequential)]public struct RECT{public int Left;public int Top;public int Right;public int Bottom;}}'

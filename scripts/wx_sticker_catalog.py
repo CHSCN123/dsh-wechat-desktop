@@ -6,7 +6,7 @@
   python wx_sticker_catalog.py --sheet     # 拼带编号的大图方便人肉/模型认图
 
 数据来源：
-  C:\\Users\\LX\\.dsh\\weixin\\wcdb\\decrypted\\emoticon\\emoticon.db
+  <dataDir>\\wcdb\\decrypted\\emoticon\\emoticon.db
     kFavEmoticonOrderTable   收藏顺序（第 1 条 jsb_emoticon_md5、第 2 条 dice_emoticon_md5 是石头剪刀布/骰子，
                              面板里也在最前面）
     kNonStoreEmoticonTable   每个 md5 的 cdn_url（可直接 GET，回 PNG）+ aes_key
@@ -19,12 +19,14 @@
 import argparse
 import json
 import os
+
+HERE = os.path.dirname(os.path.abspath(__file__))
 import sqlite3
 import urllib.request
 
-DB = r"C:\Users\LX\.dsh\weixin\wcdb\decrypted\emoticon\emoticon.db"
-OUT = r"C:\Users\LX\.dsh\weixin\wcdb\sticker_lab\fav"
-SHEET_DIR = r"C:\Users\LX\.dsh\weixin\wcdb\sticker_lab"
+DB = os.path.join(HERE, "decrypted\\emoticon\\emoticon.db")
+OUT = os.path.join(HERE, "sticker_lab\\fav")
+SHEET_DIR = os.path.join(HERE, "sticker_lab")
 
 
 def fav_order():

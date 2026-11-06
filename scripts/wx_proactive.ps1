@@ -1,6 +1,6 @@
 ﻿# wx_proactive.ps1 - send a message nobody asked for, with a hard daily budget.
 # Usage:
-#   wx_proactive.ps1 -Chat "猪葛凉" -Text "在干嘛呀" [-Limit 2]
+#   wx_proactive.ps1 -Chat "张三" -Text "在干嘛呀" [-Limit 2]
 # Behaviour:
 #   * counts today's `proactive` rows in activity.jsonl for the same chat
 #   * refuses (exit 3) once the budget is used up
@@ -10,10 +10,10 @@ param(
   [Parameter(Mandatory=$true)][string]$Chat,
   [Parameter(Mandatory=$true)][string]$Text,
   [int]$Limit = 2,
-  [string]$Ledger = "C:\Users\LX\.dsh\weixin\wcdb\activity.jsonl",
-  [string]$OpenScript = "C:\Users\LX\.dsh\weixin\wcdb\wx_open_chat.ps1",
-  [string]$SendScript = "C:\Users\LX\.dsh\weixin\wcdb\wx_send.ps1",
-  [string]$Activity = "C:\Users\LX\.dsh\weixin\wcdb\wx_activity.ps1"
+  [string]$Ledger = "$PSScriptRoot\activity.jsonl",
+  [string]$OpenScript = "$PSScriptRoot\wx_open_chat.ps1",
+  [string]$SendScript = "$PSScriptRoot\wx_send.ps1",
+  [string]$Activity = "$PSScriptRoot\wx_activity.ps1"
 )
 
 $ErrorActionPreference = "Stop"

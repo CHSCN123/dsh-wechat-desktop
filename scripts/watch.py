@@ -12,7 +12,7 @@ Human-readable line for the log:
 Messages the logged-in account sent itself are reported as [NEW] but never as
 @@MSG, so the plugin cannot answer its own echo.
 
-  python watch.py --user wxid_hmqh1bam6y3422 [--interval 1.5] [--out inbox.jsonl]
+  python watch.py --user <wxid> [--interval 1.5] [--out inbox.jsonl]
 """
 import argparse
 import contextlib
@@ -36,8 +36,8 @@ from readmsgs import rows, fmt  # noqa: E402
 import wcdb_key_tool_windows as KEYTOOL  # noqa: E402
 
 MSG_DB_REL = os.path.join("message", "message_0.db")
-DEFAULT_DB_DIR = r"D:\LeStoreDownload\xwechat_files\wxid_kn207qgkufhp29_5794\db_storage"
-DEFAULT_DEC = r"C:\Users\LX\.dsh\weixin\wcdb\decrypted"
+DEFAULT_DB_DIR = os.environ.get("WX_DB_DIR", "")
+DEFAULT_DEC = os.environ.get("WX_DECRYPTED_DIR") or os.path.join(HERE, "decrypted")
 
 
 def load_enc_key(keys_file, rel=MSG_DB_REL):

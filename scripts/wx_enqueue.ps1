@@ -5,7 +5,7 @@ Sessions must NOT call wx_send.ps1 directly any more. Drop a job here and
 wx_worker.py sends it in order, one at a time, so two chats can never race
 for the single WeChat window.
 
-  wx_enqueue.ps1 -Chat "猪葛凉" -Text "hello"
+  wx_enqueue.ps1 -Chat "张三" -Text "hello"
   wx_enqueue.ps1 -Chat "黑暗四天王" -TextFile message.txt
   wx_enqueue.ps1 -List          # show what is waiting
 #>

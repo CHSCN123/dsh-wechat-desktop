@@ -10,9 +10,11 @@
 """
 import json
 import os
+
+HERE = os.path.dirname(os.path.abspath(__file__))
 import sys
 
-INDEX = r"C:\Users\LX\.dsh\weixin\wcdb\sticker_lab\sticker_index.json"
+INDEX = os.path.join(HERE, "sticker_lab\\sticker_index.json")
 
 
 def main():

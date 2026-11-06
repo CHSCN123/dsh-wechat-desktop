@@ -1,4 +1,4 @@
-﻿param([string]$Exe = 'D:\LeStoreDownload\xwechat_files\Weixin.exe', [int]$WaitSeconds = 25)
+﻿param([string]$Exe = $(if ($env:WX_EXE) { $env:WX_EXE } else { 'C:\Program Files\Tencent\WeChat\Weixin.exe' }), [int]$WaitSeconds = 25)
 # Start WeChat in the CURRENT desktop if it is not running yet.
 # When this script is executed by wx_vdesk_helper.ps1 the child inherits the
 # virtual desktop, so WeChat ends up living there (that is the whole point).

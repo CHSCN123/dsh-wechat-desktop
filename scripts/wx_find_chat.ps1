@@ -3,9 +3,9 @@ wx_find_chat.ps1 - open a conversation by LOOKING at the chat list (OCR) and
 clicking the row, instead of typing into the search box.
 
 Usage:
-  wx_find_chat.ps1 -Name "猪葛凉、蒙"
-  wx_find_chat.ps1 -Name "猪葛凉" -NotContains "、"
-  wx_find_chat.ps1 -Name "猪葛凉、蒙" -Json
+  wx_find_chat.ps1 -Name "张三、李四"
+  wx_find_chat.ps1 -Name "张三" -NotContains "、"
+  wx_find_chat.ps1 -Name "张三、李四" -Json
 
 Exit codes: 0 = on the target chat, 1 = could not get there.
 Keep the UTF-8 BOM: PowerShell 5.1 reads BOM-less UTF-8 as ANSI.
@@ -179,7 +179,7 @@ function Test-Header {
 $result = [pscustomobject]@{ ok = $false; via = ''; hwnd = $win.Hwnd; name = $Name; click = $null; matched = '' }
 
 # 1) Trust only the cache, never the header, for "we are already there".
-# OCR regularly truncates the group title ("猪葛凉、蒙(3)" -> "猪葛凉") and that made
+# OCR regularly truncates the group title ("张三、李四(3)" -> "张三") and that made
 # the finder claim it was already on the private chat while sitting in the group.
 $cached = ''
 try {
@@ -208,7 +208,7 @@ if ($cached -eq $Name -and $cachedHwnd -eq ([string]$hwnd)) {
       if ($txt.Contains(':') -or $txt.Contains('：')) { continue }
       if ($txt.TrimEnd().EndsWith([char]0x3001)) {
         # Group rows are split by OCR: the name line ends with the ideographic
-        # comma ("猪葛凉、") and the second member is on another line. For a group
+        # comma ("张三、") and the second member is on another line. For a group
         # target that first line IS the row we want; for a private target skip it.
         if ($Name.Contains([char]0x3001)) {
           $firstSeg = $Name.Split([char]0x3001)[0]
@@ -254,7 +254,7 @@ if ($cached -eq $Name -and $cachedHwnd -eq ([string]$hwnd)) {
   } else {
     # The list may be scrolled away from the target: scroll it to the top, then try
     # exactly once more before giving up (2026-10-31: a scrolled list made the
-    # finder miss 猪葛凉 entirely and fail the switch).
+    # finder miss 张三 entirely and fail the switch).
     $result.matched = ''
     [void][WxFc]::SetCursorPos([int]($left + 0.15 * $w), [int]($top + 0.35 * $h))
     Start-Sleep -Milliseconds 150
@@ -272,7 +272,7 @@ if ($cached -eq $Name -and $cachedHwnd -eq ([string]$hwnd)) {
         if ($txt.Contains(':') -or $txt.Contains('：')) { continue }
         if ($txt.TrimEnd().EndsWith([char]0x3001)) {
         # Group rows are split by OCR: the name line ends with the ideographic
-        # comma ("猪葛凉、") and the second member is on another line. For a group
+        # comma ("张三、") and the second member is on another line. For a group
         # target that first line IS the row we want; for a private target skip it.
         if ($Name.Contains([char]0x3001)) {
           $firstSeg = $Name.Split([char]0x3001)[0]
@@ -311,7 +311,7 @@ if (-not $result.ok) {
     # 2026-10-31 rewrite of the last-resort search:
     #  * no child processes at all (each one compiled C# and stole the foreground)
     #  * never type unless this window is really the foreground window
-    #  * Ctrl+A + Delete first, so a leftover query cannot turn into "猪葛凉猪葛凉"
+    #  * Ctrl+A + Delete first, so a leftover query cannot turn into "张三张三"
     #  * one single attempt, no retry loop - a failed search must not chew on the
     #    client (that is what froze WeChat 4.2 tonight)
     Add-Type -AssemblyName System.Windows.Forms

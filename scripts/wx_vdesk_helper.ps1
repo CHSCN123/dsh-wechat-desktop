@@ -3,7 +3,7 @@
   [int]$Port = 47660,
   [int]$IdleMinutes = 0,      # 0 = never exit on idle
   [int]$RequestTimeoutSeconds = 45,
-  [string]$LogFile = 'C:\Users\LX\.dsh\weixin\wcdb\vdesk_helper.log'
+  [string]$LogFile = (Join-Path $PSScriptRoot 'vdesk_helper.log')
 )
 
 # Plan A helper: lives ON the virtual desktop (see wx_vdesk_launch.ps1).
@@ -74,7 +74,7 @@ public class WxDeskHelper {
 
 $PS = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
 $HelperDir = Split-Path -Parent $PSCommandPath
-$Send = 'C:\Users\LX\.dsh\weixin\wcdb\wx_send.ps1'
+$Send = (Join-Path $PSScriptRoot 'wx_send.ps1')
 
 function Write-Log([string]$line) {
   $ts = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')

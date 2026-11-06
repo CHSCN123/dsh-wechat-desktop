@@ -20,6 +20,8 @@ import argparse
 import ctypes
 import json
 import os
+
+HERE = os.path.dirname(os.path.abspath(__file__))
 import random
 import re
 import subprocess
@@ -32,10 +34,10 @@ user32 = ctypes.WinDLL("user32", use_last_error=True)
 gdi32 = ctypes.WinDLL("gdi32", use_last_error=True)
 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 
-DEBUG_DIR = r"E:\DSH\GZJT GC"
-PROFILE = r"C:\Users\LX\.dsh\weixin\wcdb\sticker_profile.json"
-WX_SEND = r"C:\Users\LX\.dsh\weixin\wcdb\wx_send.ps1"
-WX_ACT = r"C:\Users\LX\.dsh\weixin\wcdb\wx_activity.ps1"
+DEBUG_DIR = r"E:\shots"
+PROFILE = os.path.join(HERE, "sticker_profile.json")
+WX_SEND = os.path.join(HERE, "wx_send.ps1")
+WX_ACT = os.path.join(HERE, "wx_activity.ps1")
 PS = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
 
 WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_LBUTTONUP = 0x0200, 0x0201, 0x0202
@@ -329,7 +331,7 @@ def panel_picture(panel):
     return img
 
 
-FAV_DIR = r"C:\Users\LX\.dsh\weixin\wcdb\sticker_lab\fav"
+FAV_DIR = os.path.join(HERE, "sticker_lab\\fav")
 
 
 def content_sig(img, n=24):

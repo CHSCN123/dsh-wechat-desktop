@@ -12,11 +12,27 @@
   # client we must type into. Both the bot and the human's own WeChat can be
   # logged in at the same time; typing into the wrong one sends the reply FROM
   # the human, which looks exactly like the peer answering itself.
-  [string]$DbFile = 'D:\LeStoreDownload\xwechat_files\wxid_kn207qgkufhp29_5794\db_storage\message\message_0.db',
+  [string]$DbFile = $(
+    if ($env:WX_DB_FILE) { $env:WX_DB_FILE }
+    else {
+      $localEnv = Join-Path $PSScriptRoot 'local-env.json'
+      if (Test-Path -LiteralPath $localEnv) {
+        (Get-Content -LiteralPath $localEnv -Raw -Encoding UTF8 | ConvertFrom-Json).dbFile
+      } else { '' }
+    }
+  ),
   # Fallback identification when Restart Manager reports no db owner: the bot
   # window is the one whose chat list shows this contact (OCR). The human's own
   # client never has it, so we still never type into the wrong account.
-  [string]$BotMarker = '猪葛凉',
+  [string]$BotMarker = $(
+    if ($env:WX_BOT_MARKER) { $env:WX_BOT_MARKER }
+    else {
+      $localEnv = Join-Path $PSScriptRoot 'local-env.json'
+      if (Test-Path -LiteralPath $localEnv) {
+        (Get-Content -LiteralPath $localEnv -Raw -Encoding UTF8 | ConvertFrom-Json).botMarker
+      } else { '' }
+    }
+  ),
   [string]$Chat = '',
   [string]$ExpectChat = '',
   [string]$ExpectNotContains = '',
@@ -49,7 +65,7 @@
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 # -Chat "<显示名>" 是给 agent 用的便捷入口：名字直接抄 inbound 头里的
-# 「群聊 猪葛凉、蒙」/「私聊 猪葛凉」。这里负责把它翻译成
+# 「群聊 张三、李四」/「私聊 张三」。这里负责把它翻译成
 #   ExpectChat（切过去时校验的标题）、ExpectNotContains（私聊要排除带"、"的群标题）、
 #   VerifyChat（对账用的会话 id，从 watched-chats.txt 查）。
 if ($Chat -ne '') {
@@ -481,7 +497,7 @@ if ($rect.Left -lt -8 -or $rect.Left -gt 8 -or $rect.Top -lt -8 -or $rect.Top -g
 # 发之前先截图留证：一看就知道"当前会话到底是谁"，出问题能复盘
 try {
   Add-Type -AssemblyName System.Drawing -ErrorAction SilentlyContinue
-  $shotPath = Join-Path 'E:\DSH\GZJT GC' ('send-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.png')
+  $shotPath = Join-Path $env:TEMP 'wx-shots' ('send-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.png')
   $bmpShot = New-Object System.Drawing.Bitmap 1920, 1080
   $gfxShot = [System.Drawing.Graphics]::FromImage($bmpShot)
   $gfxShot.CopyFromScreen(0, 0, 0, 0, $bmpShot.Size)
@@ -537,7 +553,7 @@ if ($ExpectChat -ne '') {
     throw ("wx_send: the open chat is not '" + $ExpectChat + "'; refusing to type a reply (finder said: " + $fOut.Trim() + ")")
   }
   # 再自己看一眼表头（不看图不算过）：OCR 认出来的标题必须就是 ExpectChat，
-  # 群里那种「猪葛凉、蒙」要额外用 ExpectNotContains 挡掉，否则会发进群。
+  # 群里那种「张三、李四」要额外用 ExpectNotContains 挡掉，否则会发进群。
   Start-Sleep -Milliseconds 250
   $rr = New-Object WxSend+RECT
   [void][WxSend]::GetWindowRect($h, [ref]$rr)
@@ -646,7 +662,7 @@ if (-not $clipOk) {
 }
 Start-Sleep -Milliseconds 120
 
-$pyExe = "E:\DSH\DSH Desktop\resources\office-runtime\primary-runtime\dependencies\python\python.exe"
+$pyExe = $(if ($env:WX_PYTHON) { $env:WX_PYTHON } else { 'python' })
 $inputCheck = Join-Path $PSScriptRoot "wx_input_check.py"
 Assert-Foreground $h
 # Ctrl+V
@@ -776,7 +792,15 @@ if (-not $NoEnter -and $UseSendButton) {
   $py = 'C:\Users\LX\.dsh\weixin\asr-venv\Scripts\python.exe'
   $reader = Join-Path $PSScriptRoot 'readmsgs.py'
   $peer = $VerifyChat
-  if ($peer -eq '') { $peer = 'wxid_hmqh1bam6y3422' }
+  if ($peer -eq '') { $peer = $(
+      if ($env:WX_BOT_WXID) { $env:WX_BOT_WXID }
+      else {
+        $localEnv = Join-Path $PSScriptRoot 'local-env.json'
+        if (Test-Path -LiteralPath $localEnv) {
+          (Get-Content -LiteralPath $localEnv -Raw -Encoding UTF8 | ConvertFrom-Json).botWxid
+        } else { '' }
+      }
+    ) }
   $probe = $Text.Trim()
   if ($probe.Length -gt 20) { $probe = $probe.Substring(0, 20) }
   $verifyOk = $false

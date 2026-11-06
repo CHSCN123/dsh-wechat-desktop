@@ -20,3 +20,9 @@ dist/
 .vscode/
 .idea/
 .DS_Store
+
+# 本机私有配置（dbFile/botMarker/botWxid）
+scripts/local-env.json
+
+# 去个人信息前的原始脚本备份
+scripts/bak-depersonalize/

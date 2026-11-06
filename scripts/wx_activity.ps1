@@ -14,7 +14,7 @@ param(
   [string]$Text = '',
   [string]$Sender = 'self',
   [int]$N = 10,
-  [string]$Path = 'C:\Users\LX\.dsh\weixin\wcdb\activity.jsonl'
+  [string]$Path = (Join-Path $PSScriptRoot 'activity.jsonl')
 )
 $ErrorActionPreference = 'Stop'
 if ($Add) {

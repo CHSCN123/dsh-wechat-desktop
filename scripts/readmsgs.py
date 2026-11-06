@@ -8,6 +8,8 @@ import argparse
 import hashlib
 import json
 import os
+
+HERE = os.path.dirname(os.path.abspath(__file__))
 import sqlite3
 import sys
 import time
@@ -130,7 +132,7 @@ def main():
     # --expect mode: compare inside python so console encoding never matters
     ap = argparse.ArgumentParser()
     ap.add_argument("--user", required=True)
-    ap.add_argument("--db-dir", default=r"C:\Users\LX\.dsh\weixin\wcdb\decrypted")
+    ap.add_argument("--db-dir", default=os.environ.get("WX_DECRYPTED_DIR") or os.path.join(HERE, "decrypted"))
     ap.add_argument("--limit", type=int, default=20)
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--expect", default=None, help="print FOUND/NOTFOUND instead of rows; used by wx_send.ps1 to verify a send")

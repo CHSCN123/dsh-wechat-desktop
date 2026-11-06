@@ -2,11 +2,13 @@
 不碰微信窗口，纯算法。"""
 import importlib.util
 import os
+
+HERE = os.path.dirname(os.path.abspath(__file__))
 import sys
 
 from PIL import Image
 
-spec = importlib.util.spec_from_file_location("wx_sticker", r"C:\Users\LX\.dsh\weixin\wcdb\wx_sticker.py")
+spec = importlib.util.spec_from_file_location("wx_sticker", os.path.join(HERE, "wx_sticker.py"))
 ws = importlib.util.module_from_spec(spec)
 sys.modules["wx_sticker"] = ws
 spec.loader.exec_module(ws)

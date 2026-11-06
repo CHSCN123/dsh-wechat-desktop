@@ -7,7 +7,7 @@
 
 param(
   [string]$QueueFile = (Join-Path $PSScriptRoot 'moments-queue.txt'),
-  [string]$ImageDir = 'E:\DSH\SCDTP',
+  [string]$ImageDir = (Join-Path $env:TEMP 'wx-images'),
   [string]$LogFile = (Join-Path $PSScriptRoot 'moments.log'),
   [switch]$NoPublish
 )

@@ -119,6 +119,23 @@ python %USERPROFILE%\.dsh\weixin\wcdb\watch.py --once            # 首次解密�
 
 ---
 
+### 本机私有值（不进仓库）
+
+脚本里不写死任何数据库路径或联系人名。缺省值按这个顺序取：
+
+1. 命令行参数（如 `-DbFile`）
+2. 环境变量：`WX_DB_FILE` / `WX_DB_DIR` / `WX_BOT_MARKER` / `WX_BOT_WXID` / `WX_EXE` / `WX_PYTHON` / `WX_DECRYPTED_DIR`
+3. 脚本同目录的 `local-env.json`（已在 `.gitignore`）
+
+```json
+{
+  "dbDir": "D:\\WeChat\\xwechat_files\\wxid_xxx\\db_storage",
+  "dbFile": "D:\\WeChat\\xwechat_files\\wxid_xxx\\db_storage\\message\\message_0.db",
+  "botMarker": "你备注里的联系人名",
+  "botWxid": "wxid_xxx"
+}
+```
+
 ## 本地面板（可选）
 
 配置里写 `panelPort: 47180` 并重启，浏览器打开 http://127.0.0.1:47180 就能看到：

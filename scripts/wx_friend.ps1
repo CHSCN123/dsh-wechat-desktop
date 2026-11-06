@@ -3,12 +3,20 @@
   # ASCII-only comments: PowerShell 5.1 parses a BOM-less script as ANSI.
   [string]$Welcome = '',
   [long]$Hwnd = 0,
-  [string]$DbFile = 'D:\LeStoreDownload\xwechat_files\wxid_kn207qgkufhp29_5794\db_storage\message\message_0.db',
+  [string]$DbFile = $(
+    if ($env:WX_DB_FILE) { $env:WX_DB_FILE }
+    else {
+      $localEnv = Join-Path $PSScriptRoot 'local-env.json'
+      if (Test-Path -LiteralPath $localEnv) {
+        (Get-Content -LiteralPath $localEnv -Raw -Encoding UTF8 | ConvertFrom-Json).dbFile
+      } else { '' }
+    }
+  ),
   # Stop right before the final "确定" in the verification dialog.
   [switch]$NoConfirm,
   # Only open 新的朋友 and report whether anything is pending (no clicking).
   [switch]$Probe,
-  [string]$ShotDir = 'E:\DSH\GZJT GC',
+  [string]$ShotDir = (Join-Path $env:TEMP 'wx-shots'),
   [int]$WinX = 0, [int]$WinY = 0, [int]$WinW = 1500, [int]$WinH = 830
 )
 

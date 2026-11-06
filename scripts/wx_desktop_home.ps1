@@ -1,5 +1,5 @@
 ﻿param(
-  [string]$Exe = 'D:\LeStoreDownload\xwechat_files\Weixin.exe',
+  [string]$Exe = $(if ($env:WX_EXE) { $env:WX_EXE } else { 'C:\Program Files\Tencent\WeChat\Weixin.exe' }),
   [int]$WaitSeconds = 30,
   [switch]$Quiet
 )
