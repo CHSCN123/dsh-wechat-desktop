@@ -59,13 +59,26 @@
 
 ## 安装
 
-### 0. 一条命令（推荐）
+### 0. 一键安装（推荐）
+
+先拿到本仓库，然后跑 `install.ps1`：
 
 ```powershell
-.\setup.ps1 -DbDir 'D:\WeChat\xwechat_files\wxid_xxx\db_storage' -ChatUser 'wxid_xxx' -PeerName '张三'
+git clone https://github.com/CHSCN123/dsh-wechat-desktop.git
+cd dsh-wechat-desktop
+powershell -ExecutionPolicy Bypass -File .\install.ps1 `
+  -DbDir   'D:\WeChat\xwechat_files\wxid_xxx\db_storage' `
+  -ChatUser 'wxid_xxx' `
+  -PeerName '张三'
 ```
 
-它会检查 Python / Node、把 `scripts/` 复制到 `~/.dsh/weixin/wcdb`、把配置块写进 profile 的 `cordis.patch.yml`（带标记，重复跑只更新，不会重复定义）。装完重启一次 DSH 即可。
+`install.ps1` 会：
+
+1. 找到本机的 DSH 安装（`node`、`dsh` 的 `bin.js`、`profiles\web`）；
+2. 用 `dsh plugin --profile web add` 把插件装进 profile（本地目录或 git 源都行），并确认 `dsh.profile.bundles` 里有它；
+3. 调 `setup.ps1` 写配置块（检查 Python/Node、复制 `scripts/`、写 `cordis.patch.yml`）。
+
+参数：`-Profile web`、`-SkipConfig`（只装插件不写配置）、`-LocalPath <目录>`（默认就是当前目录）、`-PanelPort 47180`、`-DshHome <路径>`。装完重启一次 DSH 即可；设置里会出现「微信桌面桥」。
 
 下面的 1–4 是它做的事，手动装时照着来。
 

@@ -36,6 +36,23 @@ This is not an auto-reply bot for strangers. It makes your *own* WeChat client a
 
 ## Install
 
+### One command (recommended)
+
+```powershell
+git clone https://github.com/CHSCN123/dsh-wechat-desktop.git
+cd dsh-wechat-desktop
+powershell -ExecutionPolicy Bypass -File .\install.ps1 `
+  -DbDir    'D:\WeChat\xwechat_files\wxid_xxx\db_storage' `
+  -ChatUser 'wxid_xxx' `
+  -PeerName 'Alice'
+```
+
+`install.ps1` locates your DSH install, adds the plugin to the profile with `dsh plugin --profile web add`, ensures it is listed in `dsh.profile.bundles`, then runs `setup.ps1` to write the config block. Options: `-SkipConfig`, `-LocalPath`, `-PanelPort`, `-Profile`, `-DshHome`.
+
+Restart DSH afterwards; a **WeChat Desk Bridge** section appears in Settings.
+
+### Manual steps
+
 ```powershell
 dsh plugin --profile web add dsh-wx-desktop
 dsh plugin --profile web add dsh-plugin-weixin
