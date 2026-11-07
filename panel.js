@@ -17,10 +17,12 @@
  *   POST /api/settings     patch numbers / triggers (writes <wcdb>/settings.json)
  *   POST /api/chats        { op: 'add' | 'remove', id, name } -> watch list
  *   POST /api/blacklist    { op: 'add' | 'remove', id, name } -> blockedChats
+ *   GET  /api/persona      the workspace AGENTS.md (人设提示词)
+ *   POST /api/persona      { text } -> rewrite it (old copy kept as .bak-panel-*)
  */
 import { createServer } from 'node:http'
-import { existsSync, readFileSync } from 'node:fs'
-import { extname, join } from 'node:path'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { dirname, extname, join } from 'node:path'
 import { DEFAULTS as SETTINGS_DEFAULTS } from './settings.js'
 
 const PAGE = `<!doctype html>
@@ -55,6 +57,8 @@ table.list td:last-child{text-align:right;width:70px}
 table.list{border-collapse:collapse;width:100%}
 table.list td{border-bottom:1px solid #232830;padding:4px 6px;font-size:13px}
 table.list td small{color:#8b94a3}
+.hint{color:#8b94a3;font-size:12px;margin:4px 0}
+textarea{width:100%;height:380px;background:#0f1115;color:#dfe6ef;border:1px solid #333b48;border-radius:8px;padding:10px;font:12.5px/1.6 ui-monospace,Consolas,"Microsoft YaHei",monospace;resize:vertical}
 </style></head><body>
 <header><h1>微信桌面桥</h1><span class="pill" id="mode">…</span><span class="pill" id="health">…</span>
 <span class="pill" id="who">…</span><button id="refresh">刷新</button></header>
@@ -91,6 +95,16 @@ table.list td small{color:#8b94a3}
       <label>显示名 <input id="blk-name" type="text" style="width:100%"></label>
       <div><button id="add-blocked">加入黑名单</button></div>
     </div>
+  </section>
+  <section style="grid-column:1/-1"><h2>人设提示词（AGENTS.md）</h2>
+    <div class="hint" id="persona-path">…</div>
+    <textarea id="persona" spellcheck="false"></textarea>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+      <button id="save-persona">保存</button>
+      <button id="reload-persona">放弃改动、重新读取</button>
+      <span class="hint" id="persona-meta"></span>
+    </div>
+    <div class="hint">保存下一轮生效，不用重启。改坏了可以从同目录的 AGENTS.md.bak-panel-* 恢复。</div>
   </section>
   <section><h2>自检</h2><pre id="check">…</pre></section>
   <section><h2>日志（尾部）</h2><pre id="log">…</pre></section>
@@ -203,12 +217,30 @@ async function addEntry(kind) {
 }
 $('add-chat').onclick = function () { addEntry('chats') }
 $('add-blocked').onclick = function () { addEntry('blocked') }
+async function loadPersona() {
+  try {
+    const d = await api('/api/persona')
+    $('persona').value = d.text
+    $('persona-path').textContent = d.path + (d.exists ? '' : '（文件还不存在，保存会新建）')
+    $('persona-meta').textContent = d.text.length + ' 字符 / ' + d.bytes + ' 字节，改动于 ' + (d.mtime || '—')
+  } catch (error) { $('persona-path').textContent = '读不到人设文件：' + error.message }
+}
+$('save-persona').onclick = async function () {
+  const text = $('persona').value
+  if (text.trim() === '') { toast('不允许保存空文件'); return }
+  try {
+    const d = await api('/api/persona', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: text }) })
+    toast('已保存（旧版本：' + (d.backup || '无') + '）')
+    loadPersona()
+  } catch (error) { toast('保存失败：' + error.message) }
+}
+$('reload-persona').onclick = function () { toast('已重新读取'); loadPersona() }
 for (const b of document.querySelectorAll('[data-mode]')) b.onclick = async () => {
   try { await api('/api/mode', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: b.dataset.mode }) }); toast('已切到 ' + b.dataset.mode.toUpperCase()); refresh() }
   catch (error) { toast('切换失败：' + error.message) }
 }
 $('refresh').onclick = refresh
-refresh(); loadStickers(); loadSettings(); setInterval(refresh, 4000)
+refresh(); loadStickers(); loadSettings(); loadPersona(); setInterval(refresh, 4000)
 </script></body></html>`
 
 const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' }
@@ -255,6 +287,13 @@ export function startPanel(options) {
     list: () => [],
     add: () => [],
     remove: () => [],
+  }
+  // 工作区人设：<cwd>/AGENTS.md（cwd 默认就是 <dataDir>/sessions）
+  const personaFile = () => join(cfg.cwd ?? join(cfg.dataDir, 'sessions'), 'AGENTS.md')
+  const stampForFile = () => {
+    const d = new Date()
+    const p = (n) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
   }
   const token = String(cfg.panelToken ?? '')
 
@@ -368,6 +407,38 @@ export function startPanel(options) {
         const next = settings.update({ blockedChats: blocked })
         log(`panel: blacklist ${op} ${id || chatName} (${blocked.length} total)`)
         return json(res, 200, { ok: true, settings: next })
+      }
+      if (req.method === 'GET' && url.pathname === '/api/persona') {
+        const file = personaFile()
+        const exists = existsSync(file)
+        const text = exists ? readFileSync(file, 'utf8') : ''
+        let mtime = ''
+        if (exists) {
+          try { mtime = new Date(statSync(file).mtimeMs).toLocaleString('zh-CN') } catch { mtime = '' }
+        }
+        return json(res, 200, {
+          path: file,
+          exists,
+          text,
+          bytes: Buffer.byteLength(text, 'utf8'),
+          mtime,
+        })
+      }
+      if (req.method === 'POST' && url.pathname === '/api/persona') {
+        const body = await readJson(req)
+        const text = String(body?.text ?? '')
+        if (text.trim() === '') return json(res, 400, { error: 'empty text' })
+        if (Buffer.byteLength(text, 'utf8') > 512 * 1024) return json(res, 400, { error: 'too large (max 512KB)' })
+        const file = personaFile()
+        let backup = ''
+        mkdirSync(dirname(file), { recursive: true })
+        if (existsSync(file)) {
+          backup = `${file}.bak-panel-${stampForFile()}`
+          try { copyFileSync(file, backup) } catch { backup = '' }
+        }
+        writeFileSync(file, text, 'utf8')
+        log(`panel: persona saved (${Buffer.byteLength(text, 'utf8')} bytes)${backup ? `, backup ${backup}` : ''}`)
+        return json(res, 200, { ok: true, path: file, backup })
       }
       return json(res, 404, { error: 'not found' })
     } catch (error) {

@@ -5,8 +5,9 @@
   - **白名单 / 黑名单**：白名单写 `watched-chats.txt`（同时也是 watcher 的轮询名单），黑名单写 `settings.json`，黑名单优先级最高。
 - 新增 `settings.js`：面板改的值落在 `<wcdb>/settings.json`，优先级高于 profile 的 YAML，插件每次处理消息时现读，改完不用重启。
 - 新增路由：`GET/POST /api/settings`、`POST /api/chats`、`POST /api/blacklist`。
+- **人设提示词也能在面板里改**：新增 `GET/POST /api/persona`，直接编辑工作区的 `AGENTS.md`（默认 `<dataDir>/sessions/AGENTS.md`），保存时自动留 `.bak-panel-<时间>` 备份，下一轮生效、不用重启。
 - 回复前先过黑白名单：不在白名单的会话直接跳过（日志 `skip …: not in whitelist`），黑名单命中 `skip …: blacklisted`。
-- `tools/panel-test.mjs` 扩成设置/名单全流程冒烟（临时目录，不碰真实数据）。
+- `tools/panel-test.mjs` 扩成设置 / 名单 / 人设全流程冒烟（临时目录，不碰真实数据）。
 
 ## 0.3.1 — 2026-11-06
 

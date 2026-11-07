@@ -167,8 +167,9 @@ python %USERPROFILE%\.dsh\weixin\wcdb\watch.py --once            # 首次解密�
 - 收藏表情墙，点一下就把那张表情发出去
 - **参数区：私聊/群聊冷却、时间闸、积压合批、轮询间隔、群触发词，改完点保存立即生效**（不用重启，也不用碰 YAML）
 - **白名单 / 黑名单**：白名单 = 监控并回复的会话（写 `watched-chats.txt`），黑名单 = 永不回复（写 `settings.json`，优先级最高）
+- **人设提示词**：直接编辑工作区的 `AGENTS.md`（默认 `<dataDir>/sessions/AGENTS.md`），保存自动留备份，下一轮回复就生效
 
-面板改的东西落在两个文件：「参数 + 黑名单」进 `<wcdb>/settings.json`，「白名单」进 `<wcdb>/watched-chats.txt`，两个都是纯文本，想手改也行。
+面板改的东西落在三个文件：「参数 + 黑名单」进 `<wcdb>/settings.json`，「白名单」进 `<wcdb>/watched-chats.txt`，「人设」就是工作区那个 `AGENTS.md`，都是纯文本，想手改也行。
 
 只绑 127.0.0.1；要转发端口就设 `panelToken`，访问时带 `?token=...`。
 

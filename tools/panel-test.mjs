@@ -5,7 +5,7 @@
  *
  *   node tools/panel-test.mjs
  */
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DEFAULTS, resolveConfig, selfCheck, formatSelfCheck } from 'file:///E:/DSH/dsh-wx-desktop/index.js'
@@ -111,6 +111,18 @@ console.log('log lines =', log.text.split('\n').length)
 
 const send = await post('/api/sticker', { index: 8 })
 console.log('POST /api/sticker =', send.status, await send.text())
+
+// --- persona (workspace AGENTS.md) ---
+mkdirSync(cfg.cwd, { recursive: true })
+const personaPath = join(cfg.cwd, 'AGENTS.md')
+writeFileSync(personaPath, '# 原人设\n\n- 第一条\n', 'utf8')
+const p1 = await (await fetch(base + '/api/persona')).json()
+console.log('persona GET =', p1.exists, p1.bytes, 'bytes |', p1.path)
+const p2 = await (await post('/api/persona', { text: '# 新人设\n\n- 改过了\n' })).json()
+console.log('persona POST =', p2.ok, '| backup =', p2.backup.split('\\').pop())
+console.log('persona file now =', JSON.stringify(readFileSync(personaPath, 'utf8')))
+const p3 = await post('/api/persona', { text: '   ' })
+console.log('persona empty rejected =', p3.status)
 
 server.close()
 console.log('closed | data dir =', dataDir)
