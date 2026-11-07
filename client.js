@@ -45,6 +45,10 @@ window.__ModuleLoader__.load({
           src: PANEL_URL,
           title: '微信桌面桥面板',
           loading: 'lazy',
+          // 面板里「双击空白处全屏」靠这个：没有 allow="fullscreen"，iframe 内
+          // requestFullscreen() 会被浏览器直接拒绝。
+          allow: 'fullscreen',
+          allowFullScreen: true,
         }) : null,
         h('div', { className: 'wxdbHint' },
           '面板由插件主机开在 127.0.0.1:47180。空白说明插件没在跑或端口被改过：到 profile 的配置里看 panelPort，或发 /doctor 自查。'))

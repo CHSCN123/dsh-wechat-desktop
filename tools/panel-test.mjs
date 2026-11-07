@@ -5,7 +5,7 @@
  *
  *   node tools/panel-test.mjs
  */
-import { mkdirSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DEFAULTS, resolveConfig, selfCheck, formatSelfCheck } from 'file:///E:/DSH/dsh-wx-desktop/index.js'
@@ -123,6 +123,14 @@ console.log('persona POST =', p2.ok, '| backup =', p2.backup.split('\\').pop())
 console.log('persona file now =', JSON.stringify(readFileSync(personaPath, 'utf8')))
 const p3 = await post('/api/persona', { text: '   ' })
 console.log('persona empty rejected =', p3.status)
+// 只保留一级历史：再存一次，备份仍只有一个文件、内容是"上一次保存的"
+await post('/api/persona', { text: '# 第三版\n' })
+const bakFiles = readdirSync(cfg.cwd).filter((f) => f.includes('.bak'))
+console.log('backup files =', JSON.stringify(bakFiles), '| bak content =', JSON.stringify(readFileSync(personaPath + '.bak', 'utf8')))
+const r1 = await (await post('/api/persona/restore', {})).json()
+console.log('restore =', r1.ok, '| file now =', JSON.stringify(readFileSync(personaPath, 'utf8')))
+const r2 = await post('/api/persona/restore', {})
+console.log('restore again (same single backup) =', r2.status)
 
 server.close()
 console.log('closed | data dir =', dataDir)

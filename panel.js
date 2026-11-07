@@ -101,10 +101,11 @@ textarea{width:100%;height:380px;background:#0f1115;color:#dfe6ef;border:1px sol
     <textarea id="persona" spellcheck="false"></textarea>
     <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
       <button id="save-persona">保存</button>
+      <button id="undo-persona">回滚到上一个版本</button>
       <button id="reload-persona">放弃改动、重新读取</button>
       <span class="hint" id="persona-meta"></span>
     </div>
-    <div class="hint">保存下一轮生效，不用重启。改坏了可以从同目录的 AGENTS.md.bak-panel-* 恢复。</div>
+    <div class="hint">保存下一轮生效，不用重启。每次保存只会留<b>一份</b>旧版本（AGENTS.md.bak），所以只能回滚一级；没保存前想撤销，直接 Ctrl+Z。</div>
   </section>
   <section><h2>自检</h2><pre id="check">…</pre></section>
   <section><h2>日志（尾部）</h2><pre id="log">…</pre></section>
@@ -222,19 +223,44 @@ async function loadPersona() {
     const d = await api('/api/persona')
     $('persona').value = d.text
     $('persona-path').textContent = d.path + (d.exists ? '' : '（文件还不存在，保存会新建）')
-    $('persona-meta').textContent = d.text.length + ' 字符 / ' + d.bytes + ' 字节，改动于 ' + (d.mtime || '—')
+    $('persona-meta').textContent = d.text.length + ' 字符 / ' + d.bytes + ' 字节，改动于 ' + (d.mtime || '—') +
+      (d.hasBackup ? ' ｜ 可回滚的上一个版本：' + (d.backupAt || '有') : ' ｜ 还没有旧版本')
+    $('undo-persona').disabled = !d.hasBackup
   } catch (error) { $('persona-path').textContent = '读不到人设文件：' + error.message }
 }
 $('save-persona').onclick = async function () {
   const text = $('persona').value
   if (text.trim() === '') { toast('不允许保存空文件'); return }
   try {
-    const d = await api('/api/persona', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: text }) })
-    toast('已保存（旧版本：' + (d.backup || '无') + '）')
+    await api('/api/persona', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: text }) })
+    toast('已保存，上一个版本留着可回滚')
     loadPersona()
   } catch (error) { toast('保存失败：' + error.message) }
 }
+$('undo-persona').onclick = async function () {
+  if (!confirm('用上一个版本覆盖现在的内容？只回滚一级。')) return
+  try {
+    const d = await api('/api/persona/restore', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+    $('persona').value = d.text
+    toast('已回滚到上一个版本')
+    loadPersona()
+  } catch (error) { toast('回滚失败：' + error.message) }
+}
 $('reload-persona').onclick = function () { toast('已重新读取'); loadPersona() }
+// ---- 双击空白处全屏（再双击或 Esc 退出；iframe 里不支持就开新窗口）----
+function isControl(t) {
+  return t && t.closest && t.closest('button,input,textarea,select,a,table,pre,figure,label')
+}
+function toggleFullscreen() {
+  if (document.fullscreenElement) { document.exitFullscreen().catch(function () {}); return }
+  const el = document.documentElement
+  if (el.requestFullscreen) {
+    el.requestFullscreen().catch(function () { window.open(location.href, '_blank', 'width=1280,height=860') })
+  } else {
+    window.open(location.href, '_blank', 'width=1280,height=860')
+  }
+}
+document.addEventListener('dblclick', function (e) { if (!isControl(e.target)) toggleFullscreen() })
 for (const b of document.querySelectorAll('[data-mode]')) b.onclick = async () => {
   try { await api('/api/mode', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: b.dataset.mode }) }); toast('已切到 ' + b.dataset.mode.toUpperCase()); refresh() }
   catch (error) { toast('切换失败：' + error.message) }
@@ -290,11 +316,6 @@ export function startPanel(options) {
   }
   // 工作区人设：<cwd>/AGENTS.md（cwd 默认就是 <dataDir>/sessions）
   const personaFile = () => join(cfg.cwd ?? join(cfg.dataDir, 'sessions'), 'AGENTS.md')
-  const stampForFile = () => {
-    const d = new Date()
-    const p = (n) => String(n).padStart(2, '0')
-    return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
-  }
   const token = String(cfg.panelToken ?? '')
 
   const server = createServer(async (req, res) => {
@@ -416,13 +437,31 @@ export function startPanel(options) {
         if (exists) {
           try { mtime = new Date(statSync(file).mtimeMs).toLocaleString('zh-CN') } catch { mtime = '' }
         }
+        const bak = `${file}.bak`
+        const hasBackup = existsSync(bak)
+        let backupAt = ''
+        if (hasBackup) {
+          try { backupAt = new Date(statSync(bak).mtimeMs).toLocaleString('zh-CN') } catch { backupAt = '' }
+        }
         return json(res, 200, {
           path: file,
           exists,
           text,
           bytes: Buffer.byteLength(text, 'utf8'),
           mtime,
+          hasBackup,
+          backupAt,
         })
+      }
+      if (req.method === 'POST' && url.pathname === '/api/persona/restore') {
+        const file = personaFile()
+        const bak = `${file}.bak`
+        if (!existsSync(bak)) return json(res, 404, { error: '还没有备份可以回滚（至少要保存过一次）' })
+        // 只保留一级历史：回滚 = 用备份覆盖当前，备份本身不再变化。
+        const old = readFileSync(bak, 'utf8')
+        writeFileSync(file, old, 'utf8')
+        log(`panel: persona rolled back to ${bak}`)
+        return json(res, 200, { ok: true, text: old })
       }
       if (req.method === 'POST' && url.pathname === '/api/persona') {
         const body = await readJson(req)
@@ -432,12 +471,17 @@ export function startPanel(options) {
         const file = personaFile()
         let backup = ''
         mkdirSync(dirname(file), { recursive: true })
+        // 只保留一级历史：每次保存把当前内容覆盖写到 AGENTS.md.bak
         if (existsSync(file)) {
-          backup = `${file}.bak-panel-${stampForFile()}`
-          try { copyFileSync(file, backup) } catch { backup = '' }
+          try {
+            backup = `${file}.bak`
+            copyFileSync(file, backup)
+          } catch {
+            backup = ''
+          }
         }
         writeFileSync(file, text, 'utf8')
-        log(`panel: persona saved (${Buffer.byteLength(text, 'utf8')} bytes)${backup ? `, backup ${backup}` : ''}`)
+        log(`panel: persona saved (${Buffer.byteLength(text, 'utf8')} bytes)`)
         return json(res, 200, { ok: true, path: file, backup })
       }
       return json(res, 404, { error: 'not found' })
