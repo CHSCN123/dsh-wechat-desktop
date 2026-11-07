@@ -18,6 +18,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { appendFile, unlink, writeFile } from 'node:fs/promises'
 import { startPanel } from './panel.js'
+import { applySettings, readChatList, readSettings, sanitizePatch, writeChatList, writeSettings } from './settings.js'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -121,6 +122,7 @@ export const DEFAULTS = {
   vdeskClientScript: '',
   /** wxid|nickname lines: also used to name conversations and to open them. */
   chatListFile: '',
+  settingsFile: '',
   /** One DSH session per conversation: `desktop:<chat>`. */
   conversationPrefix: 'desktop:',
   /** 1:1 chats: ignore a burst of messages that arrive within this window. */
@@ -190,6 +192,7 @@ export function resolveConfig(input) {
   fill('sayScript', join(wcdb, 'wx_say.ps1'))
   fill('vdeskClientScript', join(wcdb, 'wx_vdesk_client.ps1'))
   fill('chatListFile', join(wcdb, 'watched-chats.txt'))
+  fill('settingsFile', join(wcdb, 'settings.json'))
   fill('cwd', join(cfg.dataDir, 'sessions'))
   if (cfg.conversationId === '' && cfg.chatUser !== '') {
     cfg.conversationId = `${cfg.conversationPrefix ?? 'desktop:'}${cfg.chatUser}`
@@ -323,6 +326,9 @@ export function formatSelfCheck(result) {
 
 export function apply(ctx, config) {
   const cfg = resolveConfig({ ...DEFAULTS, ...(config ?? {}) })
+  // 面板可改的参数（冷却 / 时间闸 / 合批 / 轮询间隔 / 触发词 / 黑名单）存在
+  // <wcdb>/settings.json，每次用它时现读，改完不用重启。
+  const eff = () => applySettings(cfg, readSettings(cfg))
   const fileLog = (level, line) => {
     appendFile(cfg.logPath, `${new Date().toISOString()} ${level} ${line}\n`, 'utf8').catch(() => {})
   }
@@ -407,7 +413,7 @@ export function apply(ctx, config) {
       const args = [
         cfg.watcherScript,
         '--user', cfg.chatUser,
-        '--interval', String(cfg.intervalSeconds),
+        '--interval', String(eff().intervalSeconds),
         '--out', cfg.inboxPath,
         '--db-dir', cfg.dbDir,
         '--dec', cfg.decryptDir,
@@ -465,8 +471,9 @@ export function apply(ctx, config) {
     }
     const enqueueInbound = (msg) => {
       const chat = String(msg?.chat ?? '')
-      const hold = Number(cfg.backlogHoldSeconds ?? 0)
-      if (!(hold > 0) || ageSeconds(msg) < Number(cfg.backlogAgeSeconds ?? 60)) {
+      const live = eff()
+      const hold = Number(live.backlogHoldSeconds ?? 0)
+      if (!(hold > 0) || ageSeconds(msg) < Number(live.backlogAgeSeconds ?? 60)) {
         dispatchInbound(msg)
         return
       }
@@ -607,6 +614,24 @@ export function apply(ctx, config) {
         chatNames.get(chat) ??
         (chat === cfg.chatUser ? cfg.peerName : '') ??
         ''
+      // ---- 黑名单 / 白名单 ---------------------------------------------------
+      // 白名单 = watched-chats.txt（后台也靠它决定轮询谁），主用户永远在内。
+      // 黑名单 = settings.json 的 blockedChats，命中就彻底不回（优先于白名单）。
+      {
+        const live = eff()
+        const blocked = (live.blockedChats ?? []).some(
+          (it) => (it.id !== '' && it.id === chat) || (it.name !== '' && it.name === name),
+        )
+        if (blocked) {
+          log(`skip ${chat}: blacklisted`)
+          return
+        }
+        const allowed = new Set([cfg.chatUser, ...readChatList(cfg).map((it) => it.id)])
+        if (!allowed.has(chat)) {
+          log(`skip ${chat}: not in whitelist (${allowed.size - 1} extra chats watched)`)
+          return
+        }
+      }
       // ---- 命令层：/new 最先处理（不受冷却、也不受 describe 影响） ----------
       // 以前它排在 describe 和 20 秒冷却之后，刚聊过一句再发 /new 会被直接跳过，
       // 表现就是"发了 /new 没反应、也没有新会话"。
@@ -681,18 +706,19 @@ export function apply(ctx, config) {
       // offline (or a restarted client) can flush a queue of very old messages.
       // Answering a four-day-old "早" in the evening looks broken, so stay quiet.
       const msgEpoch = Number(msg?.time ?? 0)
-      if (cfg.staleSkipSeconds > 0 && Number.isFinite(msgEpoch) && msgEpoch > 0) {
+      const live = eff()
+      if (live.staleSkipSeconds > 0 && Number.isFinite(msgEpoch) && msgEpoch > 0) {
         const ageSec = Math.round(now / 1000 - msgEpoch)
-        if (ageSec > cfg.staleSkipSeconds) {
+        if (ageSec > live.staleSkipSeconds) {
           log(
             `skip ${chat}: stale message (${Math.round(ageSec / 60)} min old > ` +
-              `${Math.round(cfg.staleSkipSeconds / 60)} min)`,
+              `${Math.round(live.staleSkipSeconds / 60)} min)`,
           )
           return
         }
       }
       const since = now - (lastReplyAt.get(chat) ?? 0)
-      const cooldown = group ? 0 : cfg.directCooldownMs
+      const cooldown = group ? 0 : live.directCooldownMs
       if (since < cooldown) {
         log(`skip ${chat}: cooldown ${Math.round(since / 1000)}s < ${Math.round(cooldown / 1000)}s`)
         return
@@ -700,7 +726,7 @@ export function apply(ctx, config) {
       if (group) {
         // Groups: answer ONLY when the message actually mentions us. No type
         // filter, no cooldown, no daily cap - a real @ mention is rare enough.
-        const triggered = (cfg.groupTriggers ?? ['@']).some((t) => t !== '' && body.includes(t))
+        const triggered = (live.groupTriggers ?? ['@']).some((t) => t !== '' && body.includes(t))
         if (!triggered) {
           log(`skip ${chat}: group message without @ mention`)
           return
@@ -985,6 +1011,28 @@ export function apply(ctx, config) {
               set: (want) => {
                 sendMode = want === 'a' ? 'a' : 'b'
                 saveMode()
+              },
+            },
+            settings: {
+              get: () => readSettings(cfg),
+              update: (patch) => {
+                const next = { ...readSettings(cfg), ...sanitizePatch(patch) }
+                writeSettings(cfg, next)
+                return next
+              },
+            },
+            chats: {
+              list: () => readChatList(cfg),
+              add: (id, chatName) => {
+                const rows = readChatList(cfg)
+                if (!rows.some((it) => it.id === id)) rows.push({ id, name: chatName })
+                writeChatList(cfg, rows)
+                return rows
+              },
+              remove: (id) => {
+                const rows = readChatList(cfg).filter((it) => it.id !== id)
+                writeChatList(cfg, rows)
+                return rows
               },
             },
             runPs,

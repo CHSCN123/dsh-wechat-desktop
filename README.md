@@ -165,6 +165,10 @@ python %USERPROFILE%\.dsh\weixin\wcdb\watch.py --once            # 首次解密�
 - 当前发送方案（A/B）与一键切换
 - 自检结果、配置摘要、日志尾巴（不用去翻 plugin.log）
 - 收藏表情墙，点一下就把那张表情发出去
+- **参数区：私聊/群聊冷却、时间闸、积压合批、轮询间隔、群触发词，改完点保存立即生效**（不用重启，也不用碰 YAML）
+- **白名单 / 黑名单**：白名单 = 监控并回复的会话（写 `watched-chats.txt`），黑名单 = 永不回复（写 `settings.json`，优先级最高）
+
+面板改的东西落在两个文件：「参数 + 黑名单」进 `<wcdb>/settings.json`，「白名单」进 `<wcdb>/watched-chats.txt`，两个都是纯文本，想手改也行。
 
 只绑 127.0.0.1；要转发端口就设 `panelToken`，访问时带 `?token=...`。
 
@@ -186,6 +190,8 @@ python %USERPROFILE%\.dsh\weixin\wcdb\watch.py --once            # 首次解密�
 | `maxReplyChars` | `1800` | 单条上限，超了自动拆分 |
 | `autoSend` | `true` | 关掉只记账不发 |
 | `panelPort` | `0` | 本地面板端口，0 = 关闭 |
+
+> 上面这些「秒」为单位的参数，装好后都可以在面板里直接改，写进 `<wcdb>/settings.json`，优先级高于 profile 里的 YAML；不用重启。
 
 ---
 

@@ -13,10 +13,15 @@
  *   GET  /api/stickers     favourite sticker index
  *   GET  /api/sticker/:i   one sticker PNG
  *   POST /api/sticker      { index } -> send it (async, result shows up in the log)
+ *   GET  /api/settings     editable settings + whitelist
+ *   POST /api/settings     patch numbers / triggers (writes <wcdb>/settings.json)
+ *   POST /api/chats        { op: 'add' | 'remove', id, name } -> watch list
+ *   POST /api/blacklist    { op: 'add' | 'remove', id, name } -> blockedChats
  */
 import { createServer } from 'node:http'
 import { existsSync, readFileSync } from 'node:fs'
 import { extname, join } from 'node:path'
+import { DEFAULTS as SETTINGS_DEFAULTS } from './settings.js'
 
 const PAGE = `<!doctype html>
 <html lang="zh"><head><meta charset="utf-8">
@@ -42,6 +47,14 @@ td:first-child{color:#9aa4b2;width:38%;white-space:nowrap}
 .grid img{width:70px;height:70px;object-fit:contain;background:#0f1115;border:1px solid #262b33;border-radius:8px}
 .grid figcaption{font-size:10px;color:#8b94a3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #toast{position:fixed;right:16px;bottom:16px;background:#2c5ea8;padding:8px 14px;border-radius:8px;opacity:0;transition:.2s}
+.form{display:grid;gap:8px}
+.form label{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:#c9d1dc}
+.form input{background:#0f1115;color:#e6e6e6;border:1px solid #333b48;border-radius:6px;padding:4px 8px;font:inherit;width:90px}
+.form input[type=text]{width:auto}
+table.list td:last-child{text-align:right;width:70px}
+table.list{border-collapse:collapse;width:100%}
+table.list td{border-bottom:1px solid #232830;padding:4px 6px;font-size:13px}
+table.list td small{color:#8b94a3}
 </style></head><body>
 <header><h1>微信桌面桥</h1><span class="pill" id="mode">…</span><span class="pill" id="health">…</span>
 <span class="pill" id="who">…</span><button id="refresh">刷新</button></header>
@@ -51,6 +64,33 @@ td:first-child{color:#9aa4b2;width:38%;white-space:nowrap}
       <button data-mode="a">A · 虚拟桌面</button><button data-mode="b">B · 主桌面</button>
     </div>
     <table id="cfg"></table>
+  </section>
+  <section><h2>参数（改完立即生效）</h2>
+    <div class="form">
+      <label>私聊冷却 <input id="s-direct" type="number" min="0" step="1"> 秒</label>
+      <label>群聊冷却 <input id="s-groupcd" type="number" min="0" step="1"> 秒</label>
+      <label>时间闸 <input id="s-stale" type="number" min="0" step="1"> 小时（更旧的手机积压消息不回）</label>
+      <label>积压合批 <input id="s-hold" type="number" min="0" step="1"> 秒 / 只收 <input id="s-age" type="number" min="0" step="1"> 秒以前的消息</label>
+      <label>轮询间隔 <input id="s-interval" type="number" min="0.5" step="0.5"> 秒（重启插件生效）</label>
+      <label>群触发词 <input id="s-triggers" type="text" style="width:100%"> （逗号分隔，默认 @）</label>
+      <div><button id="save-settings">保存参数</button></div>
+    </div>
+  </section>
+  <section><h2>白名单（监控并回复）</h2>
+    <table id="chats"></table>
+    <div class="form" style="margin-top:10px">
+      <label>wxid / 群号 <input id="chat-id" type="text" style="width:100%"></label>
+      <label>显示名 <input id="chat-name" type="text" style="width:100%"></label>
+      <div><button id="add-chat">加入白名单</button></div>
+    </div>
+  </section>
+  <section><h2>黑名单（永不回复）</h2>
+    <table id="blocked"></table>
+    <div class="form" style="margin-top:10px">
+      <label>wxid / 群号 <input id="blk-id" type="text" style="width:100%"></label>
+      <label>显示名 <input id="blk-name" type="text" style="width:100%"></label>
+      <div><button id="add-blocked">加入黑名单</button></div>
+    </div>
   </section>
   <section><h2>自检</h2><pre id="check">…</pre></section>
   <section><h2>日志（尾部）</h2><pre id="log">…</pre></section>
@@ -93,12 +133,82 @@ async function sendSticker(index) {
   catch (error) { toast('失败：' + error.message) }
   setTimeout(refresh, 1200)
 }
+function esc(v) {
+  return String(v == null ? '' : v).replace(/[<>&"]/g, function (c) {
+    return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]
+  })
+}
+function renderList(tableId, rows, kind) {
+  const el = $(tableId)
+  el.innerHTML = rows.length === 0
+    ? '<tr><td>（空）</td><td></td></tr>'
+    : rows.map(function (r) {
+        return '<tr><td>' + esc(r.name || '(未命名)') + '<br><small>' + esc(r.id) + '</small></td>' +
+          '<td><button data-del="' + esc(r.id) + '" data-kind="' + kind + '">删除</button></td></tr>'
+      }).join('')
+  for (const b of el.querySelectorAll('[data-del]')) {
+    b.onclick = function () { removeEntry(b.dataset.kind, b.dataset.del) }
+  }
+}
+async function loadSettings() {
+  try {
+    const d = await api('/api/settings')
+    const s = d.settings
+    $('s-direct').value = s.directCooldownSeconds
+    $('s-groupcd').value = s.groupCooldownSeconds
+    $('s-stale').value = Math.round((s.staleSkipSeconds / 3600) * 100) / 100
+    $('s-hold').value = s.backlogHoldSeconds
+    $('s-age').value = s.backlogAgeSeconds
+    $('s-interval').value = s.intervalSeconds
+    $('s-triggers').value = (s.groupTriggers || []).join(',')
+    renderList('chats', d.chats || [], 'chats')
+    renderList('blocked', s.blockedChats || [], 'blocked')
+  } catch (error) { toast('读取设置失败：' + error.message) }
+}
+async function removeEntry(kind, id) {
+  const path = kind === 'blocked' ? '/api/blacklist' : '/api/chats'
+  try {
+    await api(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ op: 'remove', id: id }) })
+    toast('已移除')
+    loadSettings()
+  } catch (error) { toast('移除失败：' + error.message) }
+}
+$('save-settings').onclick = async function () {
+  const patch = {
+    directCooldownSeconds: Number($('s-direct').value),
+    groupCooldownSeconds: Number($('s-groupcd').value),
+    staleSkipSeconds: Math.round(Number($('s-stale').value) * 3600),
+    backlogHoldSeconds: Number($('s-hold').value),
+    backlogAgeSeconds: Number($('s-age').value),
+    intervalSeconds: Number($('s-interval').value),
+    groupTriggers: $('s-triggers').value.split(',').map(function (x) { return x.trim() }).filter(Boolean),
+  }
+  try {
+    await api('/api/settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) })
+    toast('参数已保存')
+    loadSettings(); refresh()
+  } catch (error) { toast('保存失败：' + error.message) }
+}
+async function addEntry(kind) {
+  const id = kind === 'blocked' ? $('blk-id').value.trim() : $('chat-id').value.trim()
+  const name = kind === 'blocked' ? $('blk-name').value.trim() : $('chat-name').value.trim()
+  if (!id && !name) { toast('至少填一个'); return }
+  const path = kind === 'blocked' ? '/api/blacklist' : '/api/chats'
+  try {
+    await api(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ op: 'add', id: id, name: name }) })
+    toast('已加入')
+    if (kind === 'blocked') { $('blk-id').value = ''; $('blk-name').value = '' } else { $('chat-id').value = ''; $('chat-name').value = '' }
+    loadSettings()
+  } catch (error) { toast('加入失败：' + error.message) }
+}
+$('add-chat').onclick = function () { addEntry('chats') }
+$('add-blocked').onclick = function () { addEntry('blocked') }
 for (const b of document.querySelectorAll('[data-mode]')) b.onclick = async () => {
   try { await api('/api/mode', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: b.dataset.mode }) }); toast('已切到 ' + b.dataset.mode.toUpperCase()); refresh() }
   catch (error) { toast('切换失败：' + error.message) }
 }
 $('refresh').onclick = refresh
-refresh(); loadStickers(); setInterval(refresh, 4000)
+refresh(); loadStickers(); loadSettings(); setInterval(refresh, 4000)
 </script></body></html>`
 
 const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' }
@@ -135,6 +245,17 @@ function readStickers(cfg) {
  */
 export function startPanel(options) {
   const { cfg, log, warn, check, format, mode, runPs, sendSticker } = options
+  // Settings/whitelist are optional so the panel still boots (read-only) if a
+  // host wires it without them.
+  const settings = options.settings ?? {
+    get: () => ({ ...SETTINGS_DEFAULTS }),
+    update: () => ({ ...SETTINGS_DEFAULTS }),
+  }
+  const chats = options.chats ?? {
+    list: () => [],
+    add: () => [],
+    remove: () => [],
+  }
   const token = String(cfg.panelToken ?? '')
 
   const server = createServer(async (req, res) => {
@@ -149,6 +270,7 @@ export function startPanel(options) {
       }
       if (req.method === 'GET' && url.pathname === '/api/status') {
         const result = check()
+        const s = settings.get()
         return json(res, 200, {
           mode: mode.get(),
           healthy: result.ok,
@@ -160,9 +282,12 @@ export function startPanel(options) {
             ['脚本目录', cfg.wcdbDir ?? ''],
             ['微信库', cfg.dbDir ?? '(未配置)'],
             ['会话', cfg.conversationId ?? ''],
-            ['冷却(私聊)', `${Math.round((cfg.directCooldownMs ?? 0) / 1000)} 秒`],
-            ['时间闸', `${Math.round((cfg.staleSkipSeconds ?? 0) / 3600)} 小时`],
-            ['积压合批', `${cfg.backlogHoldSeconds}s / ${cfg.backlogAgeSeconds}s`],
+            ['冷却(私聊)', `${s.directCooldownSeconds} 秒`],
+            ['时间闸', `${Math.round((s.staleSkipSeconds / 3600) * 100) / 100} 小时`],
+            ['积压合批', `${s.backlogHoldSeconds}s / ${s.backlogAgeSeconds}s`],
+            ['轮询间隔', `${s.intervalSeconds} 秒`],
+            ['白名单', `${chats.list().length} 个`],
+            ['黑名单', `${(s.blockedChats ?? []).length} 个`],
           ],
         })
       }
@@ -200,6 +325,49 @@ export function startPanel(options) {
         if (!Number.isFinite(index)) return json(res, 400, { error: 'index required' })
         const message = await sendSticker(index)
         return json(res, 200, { ok: true, message })
+      }
+      if (req.method === 'GET' && url.pathname === '/api/settings') {
+        return json(res, 200, { settings: settings.get(), chats: chats.list(), chatUser: cfg.chatUser ?? '' })
+      }
+      if (req.method === 'POST' && url.pathname === '/api/settings') {
+        const body = await readJson(req)
+        const next = settings.update(body)
+        log(`panel: settings updated -> ${JSON.stringify(next)}`)
+        return json(res, 200, { ok: true, settings: next })
+      }
+      if (req.method === 'POST' && url.pathname === '/api/chats') {
+        const body = await readJson(req)
+        const id = String(body?.id ?? '').trim()
+        const chatName = String(body?.name ?? '').trim()
+        const op = String(body?.op ?? 'add')
+        if (op === 'add' && id === '' && chatName === '') return json(res, 400, { error: 'id or name required' })
+        if (op === 'remove') {
+          const rows = chats.remove(String(body?.id ?? ''))
+          log(`panel: whitelist - ${body?.id}`)
+          return json(res, 200, { ok: true, chats: rows })
+        }
+        const rows = chats.add(id, chatName)
+        log(`panel: whitelist + ${id} (${chatName})`)
+        return json(res, 200, { ok: true, chats: rows })
+      }
+      if (req.method === 'POST' && url.pathname === '/api/blacklist') {
+        const body = await readJson(req)
+        const current = settings.get()
+        const id = String(body?.id ?? '').trim()
+        const chatName = String(body?.name ?? '').trim()
+        const op = String(body?.op ?? 'add')
+        let blocked = Array.isArray(current.blockedChats) ? current.blockedChats.slice() : []
+        if (op === 'remove') {
+          blocked = blocked.filter((it) => !(id !== '' ? it.id === id : it.name === chatName))
+        } else {
+          if (id === '' && chatName === '') return json(res, 400, { error: 'id or name required' })
+          if (!blocked.some((it) => (id !== '' && it.id === id) || (chatName !== '' && it.name === chatName))) {
+            blocked.push({ id, name: chatName })
+          }
+        }
+        const next = settings.update({ blockedChats: blocked })
+        log(`panel: blacklist ${op} ${id || chatName} (${blocked.length} total)`)
+        return json(res, 200, { ok: true, settings: next })
       }
       return json(res, 404, { error: 'not found' })
     } catch (error) {

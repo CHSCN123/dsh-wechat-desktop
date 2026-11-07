@@ -1,9 +1,22 @@
+/**
+ * Offline smoke test for the local panel: starts the real HTTP server against a
+ * throwaway data dir, then walks every route including the settings / whitelist /
+ * blacklist ones. No WeChat, no DSH, no sending.
+ *
+ *   node tools/panel-test.mjs
+ */
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { DEFAULTS, resolveConfig, selfCheck, formatSelfCheck } from 'file:///E:/DSH/dsh-wx-desktop/index.js'
 import { startPanel } from 'file:///E:/DSH/dsh-wx-desktop/panel.js'
+import { readChatList, readSettings, sanitizePatch, writeChatList, writeSettings } from 'file:///E:/DSH/dsh-wx-desktop/settings.js'
 
+const dataDir = mkdtempSync(join(tmpdir(), 'wxdesk-panel-'))
+const wcdb = join(dataDir, 'wcdb')
 const cfg = resolveConfig({
   ...DEFAULTS,
-  dataDir: process.env.WX_DATA_DIR ?? 'C:\\Users\\me\\.dsh\\weixin',
+  dataDir,
   pythonPath: process.env.WX_PYTHON ?? 'python',
   nodePath: process.env.WX_NODE ?? 'node',
   dbDir: process.env.WX_DB_DIR ?? 'D:\\WeChat\\wxid_test\\db_storage',
@@ -11,6 +24,10 @@ const cfg = resolveConfig({
   peerName: process.env.WX_PEER_NAME ?? '张三',
   panelPort: 47189,
 })
+
+// seed a watched-chats.txt so the whitelist routes have something to edit
+writeChatList(cfg, [{ id: 'wxid_test', name: '张三' }])
+writeFileSync(join(wcdb, 'plugin.log'), 'seed line\n', 'utf8')
 
 let mode = 'b'
 const lines = []
@@ -21,43 +38,79 @@ const server = startPanel({
   check: () => selfCheck(cfg),
   format: formatSelfCheck,
   mode: { get: () => mode, set: (m) => { mode = m } },
+  settings: {
+    get: () => readSettings(cfg),
+    update: (patch) => {
+      const next = { ...readSettings(cfg), ...sanitizePatch(patch) }
+      writeSettings(cfg, next)
+      return next
+    },
+  },
+  chats: {
+    list: () => readChatList(cfg),
+    add: (id, name) => {
+      const rows = readChatList(cfg)
+      if (!rows.some((it) => it.id === id)) rows.push({ id, name })
+      writeChatList(cfg, rows)
+      return rows
+    },
+    remove: (id) => {
+      const rows = readChatList(cfg).filter((it) => it.id !== id)
+      writeChatList(cfg, rows)
+      return rows
+    },
+  },
   runPs: async () => 'stub',
   sendSticker: async (i) => `已发送 #${i}`,
 })
 
 const base = 'http://127.0.0.1:47189'
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+const post = (path, body) =>
+  fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 await wait(300)
 
 const status = await (await fetch(base + '/api/status')).json()
 console.log('mode =', status.mode, '| healthy =', status.healthy)
-console.log('rows =', status.rows.length, '| checkText =', status.checkText.split('\n')[0])
+console.log('rows =', status.rows.length, '| whitelist row =', status.rows.find((r) => r[0] === '白名单'))
+console.log('checkText first line =', status.checkText.split('\n')[0])
+console.log(lines.length, 'log lines so far')
 
 const page = await (await fetch(base + '/')).text()
-console.log('page bytes =', page.length, '| has grid =', page.includes('id="stickers"'))
+console.log('page bytes =', page.length, '| has grid =', page.includes('id="stickers"'), '| has save =', page.includes('id="save-settings"'))
 
-const stickers = await (await fetch(base + '/api/stickers')).json()
-console.log('stickers =', stickers.items.length, '| first =', JSON.stringify(stickers.items[0]))
+const before = await (await fetch(base + '/api/settings')).json()
+console.log('settings GET =', JSON.stringify(before.settings), '| chats =', JSON.stringify(before.chats))
 
-const img = await fetch(base + '/api/sticker/8')
-console.log('sticker/8 =', img.status, img.headers.get('content-type'), (await img.arrayBuffer()).byteLength, 'bytes')
+const saved = await (await post('/api/settings', {
+  directCooldownSeconds: 45,
+  staleSkipSeconds: 86_400,
+  groupTriggers: ['@肥鱼'],
+  intervalSeconds: 2.5,
+})).json()
+console.log('POST /api/settings =', saved.ok, '| cooldown =', saved.settings.directCooldownSeconds, '| stale =', saved.settings.staleSkipSeconds, '| triggers =', JSON.stringify(saved.settings.groupTriggers))
+
+const clamped = await (await post('/api/settings', { directCooldownSeconds: 999_999, intervalSeconds: 0.01 })).json()
+console.log('clamped =', clamped.settings.directCooldownSeconds, clamped.settings.intervalSeconds)
+
+const added = await (await post('/api/chats', { op: 'add', id: '123@chatroom', name: '瓦' })).json()
+console.log('whitelist + =', added.chats.map((c) => c.name).join(','))
+const removed = await (await post('/api/chats', { op: 'remove', id: '123@chatroom' })).json()
+console.log('whitelist - =', removed.chats.map((c) => c.name).join(','))
+
+const blkAdd = await (await post('/api/blacklist', { op: 'add', id: 'spam@chatroom', name: '广告群' })).json()
+console.log('blacklist + =', JSON.stringify(blkAdd.settings.blockedChats))
+const blkDel = await (await post('/api/blacklist', { op: 'remove', id: 'spam@chatroom' })).json()
+console.log('blacklist - =', JSON.stringify(blkDel.settings.blockedChats))
+
+const setMode = await post('/api/mode', { mode: 'a' })
+console.log('POST /api/mode =', setMode.status, '| mode now =', mode)
 
 const log = await (await fetch(base + '/api/log?n=5')).json()
 console.log('log lines =', log.text.split('\n').length)
 
-const setMode = await fetch(base + '/api/mode', {
-  method: 'POST',
-  headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ mode: 'a' }),
-})
-console.log('POST /api/mode =', setMode.status, '| mode now =', mode)
-
-const send = await fetch(base + '/api/sticker', {
-  method: 'POST',
-  headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ index: 8 }),
-})
+const send = await post('/api/sticker', { index: 8 })
 console.log('POST /api/sticker =', send.status, await send.text())
 
 server.close()
-console.log('closed')
+console.log('closed | data dir =', dataDir)
